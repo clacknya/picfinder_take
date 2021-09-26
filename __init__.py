@@ -5,7 +5,7 @@ from datetime import datetime,timedelta
 
 from nonebot import get_bot
 
-from hoshino import Service, log, priv, aiorequests
+from hoshino import Service, log, priv
 from hoshino.typing import CQEvent, MessageSegment
 from hoshino.util import DailyNumberLimiter
 from hoshino.config import NICKNAME

@@ -23,11 +23,6 @@ HOST_CUSTOM = {
                   'ASCII': ''
               }
 
-proxies={ 
-               'http':'',
-               'https':''
-              }        # 网络代理
-
 helptext='''
 [@竹竹+图片] 单张/多张搜图
 [竹竹搜图] 进入批量搜图模式
