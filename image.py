@@ -551,6 +551,8 @@ class ascii2d():
 
             color = await self.get_search_data('', data=html_index)
             bovw = await self.get_search_data(url2)
+            print(color)
+            print(bovw)
 
             if color:
                 putline1 = await self.add_repass("色调检索", color)
