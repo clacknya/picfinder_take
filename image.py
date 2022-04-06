@@ -23,7 +23,7 @@ logger = log.new_logger('image')
 
 async def get_pic(address):
     async with aiohttp.ClientSession(raise_for_status=True) as session:
-        async with session.get(address) as resp:
+        async with session.get(address, ssl=False) as resp:
             return await resp.read()
 
 def randcolor():
