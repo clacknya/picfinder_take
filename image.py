@@ -466,7 +466,7 @@ class ascii2d():
             html = data
         else:
             async with aiohttp.ClientSession(raise_for_status=True) as session:
-                async with session.get(url, timeout=15) as resp:
+                async with session.get(url, timeout=15, ssl=False) as resp:
                     text = await resp.text()
             html = etree.HTML(text)
 
@@ -534,7 +534,7 @@ class ascii2d():
 
         try:
             async with aiohttp.ClientSession(raise_for_status=True) as session:
-                async with session.get(url_index, timeout=7) as resp:
+                async with session.get(url_index, timeout=7, ssl=False) as resp:
                     text = await resp.text()
             html_index = etree.HTML(text)
         except Exception as e:
