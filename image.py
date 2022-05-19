@@ -408,8 +408,10 @@ class SauceNAO():
         params['api_key'] = api_key
         params['output_type'] = output_type
         params['testmode'] = testmode
-        params['dbmask'] = dbmask
-        params['dbmaski'] = dbmaski
+        if dbmask:
+            params['dbmask'] = dbmask
+        if dbmaski:
+            params['dbmaski'] = dbmaski
         params['db'] = db
         params['numres'] = numres
         self.params = params

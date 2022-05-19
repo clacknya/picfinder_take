@@ -7,7 +7,7 @@ from nonebot import get_bot
 
 import hoshino
 from hoshino import Service, log, priv
-from hoshino.typing import CQEvent
+from hoshino.typing import CQEvent, Message
 from hoshino.util import DailyNumberLimiter
 from hoshino.config import NICKNAME
 from aiocqhttp.exceptions import ActionFailed
@@ -206,11 +206,11 @@ async def replymessage(bot, ev: CQEvent):
         await bot.finish(ev, '该消息已过期，请重新转发~')
     file = ''
     print(tmsg)
-    for m in tmsg["message"]:
+    for m in Message(tmsg["message"]):
         if m["type"] == 'image':
-            file=m['file']
-            url=m['url']
-            subType=m['subType']
+            file=m['data']['file']
+            url=m['data']['url']
+            subType=m['data']['subType']
             break
     if not file:
         await bot.send(ev, '未找到图片~')
