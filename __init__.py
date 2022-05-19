@@ -121,7 +121,7 @@ async def picmessage(bot, ev: CQEvent):
     atcheck = False
     batchcheck = False
     for m in ev.message:
-        if m.type == 'at' and m.data['qq']==ev.self_id:
+        if m.type == 'at' and m.data['qq'] == str(ev.self_id):
             atcheck = True
     if pls.get_on_off_status(ev.group_id):
         if int(pls.on[ev.group_id]) == int(ev.user_id):
@@ -186,7 +186,7 @@ async def replymessage(bot, ev: CQEvent):
     flag1 = 0
     flag2 = 0
     for m in ev.message[2:]:
-        if m.type == 'at' and m.data['qq'] == ev.self_id:
+        if m.type == 'at' and m.data['qq'] == str(ev.self_id):
             flag1 = 1
     for name in NICKNAME:
         if name in cmd:
