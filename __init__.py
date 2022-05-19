@@ -13,7 +13,7 @@ from hoshino.config import NICKNAME
 from aiocqhttp.exceptions import ActionFailed
 
 from .image import get_image_data_sauce, get_image_data_ascii, check_screenshot
-from .config import threshold, SAUCENAO_KEY, SEARCH_TIMEOUT, CHAIN_REPLY, DAILY_LIMIT, helptext, CHECK, enableguild
+from .config import threshold, SAUCENAO_KEY, SEARCH_TIMEOUT, CHAIN_REPLY, DAILY_LIMIT, helptext, CHECK, enableguild, IGNORE_STAMP
 
 if type(NICKNAME) == str:
     NICKNAME = [NICKNAME]
@@ -58,7 +58,17 @@ async def start_finder(bot, ev: CQEvent):
     uid = ev.user_id
     gid = ev.group_id
     mid = ev.message_id
-    ret = re.search(r"\[CQ:image,file=(.*),url=(.*)\]", str(ev.message))
+    ret = None
+    for m in ev.message:
+        if m.type == 'image':
+            file = m.data['file']
+            url = m.data['url']
+            if 'subType' in m.data:
+                sbtype=m.data['subType']
+            else:
+                sbtype=None
+            ret=1
+            break    
     if not ret:
         if pls.get_on_off_status(gid):
             if uid == pls.on[gid]:
@@ -89,31 +99,29 @@ async def start_finder(bot, ev: CQEvent):
         if not lmtd.check(uid):
             await bot.send(ev, f'您今天已经搜过{DAILY_LIMIT}次图了，休息一下明天再来吧~', at_sender=True)
             return
-    file = ret.group(1)
-    image_data = ret.group(2)
+
     if CHECK:
-        result = await check_screenshot(bot, file, image_data)
+        result = await check_screenshot(bot, file, url)
         if result:
             if result == 1:
                 await bot.send(ev, f'[CQ:reply,id={mid}]该图似乎是手机截屏，请进行适当裁剪后再尝试搜图~\n*请注意搜索漫画时务必截取一个完整单页进行搜图~')
             if result == 2:
                 await bot.send(ev, f'[CQ:reply,id={mid}]该图似乎是长图拼接，请进行适当裁剪后再尝试搜图~\n*请注意搜索漫画时务必截取一个完整单页进行搜图~')
             return
-    if 'c2cpicdw.qpic.cn/offpic_new/' in image_data:
+    if 'c2cpicdw.qpic.cn/offpic_new/' in url:
         md5 = file[:-6].upper()
-        image_data = f"http://gchat.qpic.cn/gchatpic_new/0/0-0-{md5}/0?term=2"
+        url = f"http://gchat.qpic.cn/gchatpic_new/0/0-0-{md5}/0?term=2"
     await bot.send(ev, '正在搜索，请稍候～')
-    await picfinder(bot, ev, image_data)
+    await picfinder(bot, ev, url)
 
 
 @sv.on_message('group')
 async def picmessage(bot, ev: CQEvent):
     mid = ev.message_id
-    ret = re.search(r"\[CQ:at,qq=(\d*)\]", str(ev.message))
     atcheck = False
     batchcheck = False
-    if ret:
-        if int(ret.group(1)) == int(ev.self_id):
+    for m in ev.message:
+        if m.type == 'at' and m.data['qq']==ev.self_id:
             atcheck = True
     if pls.get_on_off_status(ev.group_id):
         if int(pls.on[ev.group_id]) == int(ev.user_id):
@@ -121,7 +129,17 @@ async def picmessage(bot, ev: CQEvent):
     if not(batchcheck or atcheck):
         return
     uid = ev.user_id
-    ret = re.search(r"\[CQ:image,file=(.*)?,url=(.*)\]", str(ev.message))
+    ret = None
+    for m in ev.message:
+        if m.type == 'image':
+            file = m.data['file']
+            url = m.data['url']
+            if 'subType' in m.data:
+                sbtype=m.data['subType']
+            else:
+                sbtype=None
+            ret=1
+            break
     if not ret:
         return
     if not priv.check_priv(ev, priv.SUPERUSER):
@@ -136,8 +154,11 @@ async def picmessage(bot, ev: CQEvent):
             await bot.send(ev, f'您今天已经搜过{DAILY_LIMIT}次图了，休息一下明天再来吧～', at_sender=True)
             pls.turn_off(ev.group_id)
             return
-    file = ret.group(1)
-    url = ret.group(2)
+    if sbtype and IGNORE_STAMP:
+        if sbtype!='0':
+            await bot.send(ev, f'[CQ:reply,id={mid}]该图为表情，已忽略~如确需搜索请尝试单发搜索或回复搜索~')
+            return
+
     if CHECK:
         result = await check_screenshot(bot, file, url)
         if result:
@@ -157,35 +178,44 @@ async def picmessage(bot, ev: CQEvent):
 async def replymessage(bot, ev: CQEvent):
     mid = ev.message_id
     uid = ev.user_id
-    ret = re.search(r"\[CQ:reply,id=(-?\d*)\](.*)", str(ev.message))
-    if not ret:
+    seg=ev.message[0]
+    if seg.type != 'reply':
         return
-    tmid = ret.group(1)
-    cmd = ret.group(2).strip()
+    tmid = seg.data['id']
+    cmd = ev.message.extract_plain_text()
     flag1 = 0
     flag2 = 0
-    if f"[CQ:at,qq={ev.self_id}]" in cmd:
-        flag1 = 1
-    else:
-        for name in NICKNAME:
-            if name in cmd:
-                flag1 = 1
-                break
+    for m in ev.message[2:]:
+        if m.type == 'at' and m.data['qq'] == ev.self_id:
+            flag1 = 1
+    for name in NICKNAME:
+        if name in cmd:
+            flag1 = 1
+            break
     for pfcmd in ['识图', '搜图', '查图', '找图']:
         if pfcmd in cmd:
             flag2 = 1
     if not (flag1 and flag2):
         return
+    if not priv.check_priv(ev, priv.SUPERUSER):
+        if not lmtd.check(uid):
+            await bot.send(ev, f'您今天已经搜过{DAILY_LIMIT}次图了，休息一下明天再来吧～', at_sender=True)
     try:
         tmsg = await bot.get_msg(self_id=ev.self_id, message_id=int(tmid))
     except ActionFailed:
         await bot.finish(ev, '该消息已过期，请重新转发~')
-    ret = re.search(r"\[CQ:image,file=(.*)?,url=(.*)\]", str(tmsg["message"]))
-    if not ret:
+    file = ''
+    print(tmsg)
+    for m in tmsg["message"]:
+        if m["type"] == 'image':
+            file=m['file']
+            url=m['url']
+            subType=m['subType']
+            break
+    if not file:
         await bot.send(ev, '未找到图片~')
         return
-    file = ret.group(1)
-    url = ret.group(2)
+        
     if CHECK:
         result = await check_screenshot(bot, file, url)
         if result:
@@ -194,9 +224,6 @@ async def replymessage(bot, ev: CQEvent):
             if result == 2:
                 await bot.send(ev, f'[CQ:reply,id={mid}]该图似乎是长图拼接，请手动进行适当裁剪后再尝试搜图~\n*请注意搜索漫画时务必截取一个完整单页进行搜图~')
             return
-    if not priv.check_priv(ev, priv.SUPERUSER):
-        if not lmtd.check(uid):
-            await bot.send(ev, f'您今天已经搜过{DAILY_LIMIT}次图了，休息一下明天再来吧～', at_sender=True)
     if 'c2cpicdw.qpic.cn/offpic_new/' in url:
         md5 = file[:-6].upper()
         url = f"http://gchat.qpic.cn/gchatpic_new/0/0-0-{md5}/0?term=2"
@@ -290,12 +317,24 @@ bot = get_bot()
 
 
 @bot.on_message('private')
-async def picprivite(ctx):
+async def picprivite(ctx: CQEvent):
     type = ctx["sub_type"]
     sid = int(ctx["self_id"])
     uid = int(ctx["sender"]["user_id"])
     gid = 0
-    ret = re.match(r"\[CQ:image,file=(.*?),url=(.*?)\]", str(ctx['message']))
+    if priv.check_block_user(uid):
+        return
+    ret = None
+    for m in ctx.message:
+        if m.type == 'image':
+            file = m.data['file']
+            url = m.data['url']
+            if 'subType' in m.data:
+                sbtype=m.data['subType']
+            else:
+                sbtype=None
+            ret=1
+            break
     if not ret:
         flag1 = flag2 = 0
         for name in NICKNAME:
@@ -311,9 +350,7 @@ async def picprivite(ctx):
     if not lmtd.check(uid):
         await bot.send_msg(self_id=sid, user_id=uid, group_id=gid, message=f'您今天已经搜过{DAILY_LIMIT}次图了，休息一下明天再来吧~')
         return
-    url = ret.group(2)
     if 'c2cpicdw.qpic.cn/offpic_new/' in url:
-        file = ret.group(1)
         md5 = file[:-6].upper()
         url = f"http://gchat.qpic.cn/gchatpic_new/0/0-0-{md5}/0?term=2"
     if type == "group":
